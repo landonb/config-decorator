@@ -992,6 +992,19 @@ def section(cls_or_name, parent=None):
             return _add_section
 
     def _add_section(cls):
+        cfg_dcor = _find_existing_cfg_dcor()
+
+        if cfg_dcor is None:
+            # The constructor calls _pull_kv_cache if parent is not None.
+            cfg_dcor = ConfigDecorator(cls, cls_or_name, parent=parent)
+
+        # For calling _pull_kv_cache, have parent be self, so
+        # one can add settings to the root config object.
+        cfg_dcor._pull_kv_cache(parent or cfg_dcor)
+
+        return cfg_dcor
+
+    def _find_existing_cfg_dcor():
         cfg_dcor = None
         if parent is None or not cls_or_name:
             if parent is not None:
@@ -1019,15 +1032,6 @@ def section(cls_or_name, parent=None):
             # and also for the reasons listed in the long previous comment,
             # return the named section if previously defined.
             cfg_dcor = parent._sections[cls_or_name]
-
-        if cfg_dcor is None:
-            # The constructor calls _pull_kv_cache if parent is not None.
-            cfg_dcor = ConfigDecorator(cls, cls_or_name, parent=parent)
-
-        # For calling _pull_kv_cache, have parent be self, so
-        # one can add settings to the root config object.
-        cfg_dcor._pull_kv_cache(parent or cfg_dcor)
-
         return cfg_dcor
 
     return _section()
