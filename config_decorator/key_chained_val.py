@@ -326,7 +326,7 @@ class KeyChainedValue(object):
         except AttributeError:
             pass
         # Nothing found so far! Finally just return the default value.
-        return self._value_conform_and_validate(self.default)
+        return self._value_conform_and_validate(self.default, is_default=True)
 
     @value.setter
     def value(self, value):
@@ -348,12 +348,25 @@ class KeyChainedValue(object):
         self._val_config = value
         self._val_origin = orig_value
 
-    def _value_conform_and_validate(self, value):
+    def _value_conform_and_validate(self, value, is_default=False):
 
         def _corformidate():
             _value = value
             addendum = None
-            if addendum is None:
+            # Don't validate the default value. One use case is a config setting
+            # for a file path: the @setting might specify a validate() function,
+            # but if that fails or if user does not specify the setting, we still
+            # want the code to be able to query the setting value (which will
+            # fallback to the default value), in which case do not raise on
+            # validation error.
+            # MAYBE/2020-12-05 15:41: Speaking of which: I'm curious why I
+            # never added a 'required' attribute. Maybe because I'm taking
+            # an ethical stance that config is never mandatory (though the
+            # client code is always welcome to print a USAGE message and to
+            # exit early if some key piece of config is missing, but it is
+            # not the job of the config definition library to enforce it,
+            # “question mark”.)
+            if addendum is None and not is_default:
                 addendum = _validate(_value)
             if addendum is None:
                 try:
@@ -398,7 +411,7 @@ class KeyChainedValue(object):
     def value_from_default(self):
         """Returns the conformed default value.
         """
-        return self._value_conform_and_validate(self.default)
+        return self._value_conform_and_validate(self.default, is_default=True)
 
     # ***
 
