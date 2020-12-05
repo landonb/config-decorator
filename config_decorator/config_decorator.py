@@ -977,6 +977,20 @@ def section(cls_or_name, parent=None):
 
           To access an instance of the decorated class, use ``_innerobj``.
     """
+    def _section():
+        # Check if decorator was @passive or @emphatic().
+        if inspect.isclass(cls_or_name):
+            # The decorator was used without being invoked first, e.g.,
+            #   @section
+            #   class Classy...
+            _add_section(cls_or_name)
+            return cls_or_name
+        else:
+            # The decorator was invoked first with arguments, so return the
+            # actual decorator which Python will call back immediately with
+            # the class being decorated.
+            return _add_section
+
     def _add_section(cls):
         cfg_dcor = None
         if parent is None or not cls_or_name:
@@ -1015,20 +1029,6 @@ def section(cls_or_name, parent=None):
         cfg_dcor._pull_kv_cache(parent or cfg_dcor)
 
         return cfg_dcor
-
-    def _section():
-        # Check if decorator was @passive or @emphatic().
-        if inspect.isclass(cls_or_name):
-            # The decorator was used without being invoked first, e.g.,
-            #   @section
-            #   class Classy...
-            _add_section(cls_or_name)
-            return cls_or_name
-        else:
-            # The decorator was invoked first with arguments, so return the
-            # actual decorator which Python will call back immediately with
-            # the class being decorated.
-            return _add_section
 
     return _section()
 
