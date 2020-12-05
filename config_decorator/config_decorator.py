@@ -485,7 +485,8 @@ class ConfigDecorator(object):
             A dict containing any unknown key-values from "config"
             that did not correspond to a known section or setting.
         """
-        unconsumed = {name: None for name in config.keys()}
+        # unconsumed aka unstructured.
+        unconsumed = {name: config[name] for name in config.keys()}
         error_messages = {}
         for section, conf_dcor in self._sections.items():
             if section in config:
