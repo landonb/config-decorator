@@ -515,7 +515,7 @@ class ConfigDecorator(object):
 
     # ***
 
-    def update_gross(self, other):
+    def update_gross(self, other, errors_ok=False):
         """Consumes all values from a dict, creating new sections and settings as necessary.
 
         Args:
@@ -545,24 +545,34 @@ class ConfigDecorator(object):
         #     and sets _sections, etc. (For now, you can work around by flattening
         #     other and using dotted names to indicate sub-sections, because the
         #     setdefault method *is* smart enough to find nested section settings.)
+        error_messages = {}
         for key, val in other.items():
             if isinstance(val, dict):
-                self.get_section(key).update_gross(val)
+                sub_errors = self.get_section(key).update_gross(val, errors_ok=errors_ok)
+                if sub_errors:
+                    error_messages[key] = sub_errors
             else:
                 try:
                     self[key] = val
                 except KeyError:
                     self.setdefault(key, val)
+                except ValueError as err:
+                    if not errors_ok:
+                        raise
+                    error_messages[key] = str(err)
+
+        return error_messages
+
 
     # (lb): We have some dict-ish methods, like setdefault, and keys, values,
     # and items, so might as well have an update method, too. But update is
     # just a shim to update_gross, so that you're aware there's also the
     # similar method, update_known. update calls update_gross, which is
     # more like the actual dict.update() method than update_known.
-    def update(self, other):
+    def update(self, other, errors_ok=False):
         """Alias to :meth:`update_gross`.
         """
-        self.update_gross(other)
+        self.update_gross(other, errors_ok=errors_ok)
 
     # ***
 
@@ -618,7 +628,10 @@ class ConfigDecorator(object):
                 doc=_('Created by `setdefault`'),
                 section=self,
             )
-            ckv.value = setting_value
+            try:
+                ckv.value = setting_value
+            except ValueError:
+                raise
             self._key_vals[ckv.name] = ckv
             return setting_value
 
@@ -814,7 +827,10 @@ class ConfigDecorator(object):
             return item
 
     def __setitem__(self, name, value):
-        self._find_one_object(name, KeyError).value = value
+        try:
+            self._find_one_object(name, KeyError).value = value
+        except ValueError:
+            raise
 
     def _find_one_object(self, name, error_cls, asobj=False):
         parts = name.split(self.SEP)
