@@ -58,6 +58,7 @@ class KeyChainedValue(object):
         validate=None,
         conform=None,
         recover=None,
+        typify_best_guess=False,
     ):
         """Inits a :class:`KeyChainedValue` object.
 
@@ -129,6 +130,7 @@ class KeyChainedValue(object):
         self._validate_f = validate
         self._conform_f = conform
         self._recover_f = recover
+        self._typify_best_guess = typify_best_guess
 
         self._value_allow_none = allow_none
         self._value_type = self._deduce_value_type(value_type)
@@ -157,6 +159,8 @@ class KeyChainedValue(object):
             # Caller can specify, say, a function to do type conversion,
             # but they're encouraged to stick to builtin types, and to
             # use `conform` if they need to change values on input.
+            if value_type is list:
+                return self._typify_list
             return value_type
         elif self.ephemeral:
             return lambda val: val
@@ -250,6 +254,9 @@ class KeyChainedValue(object):
                 return False
             else:
                 raise ValueError(_(" (Expected a bool, or “True” or “False”)"))
+        if self._typify_best_guess and isinstance(value, list):
+            # For unstructured config, if ConfigObj says it's a list, so be it!
+            return value
         try:
             value = self._value_type(value)
         except Exception as err:

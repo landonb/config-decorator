@@ -219,7 +219,13 @@ class ConfigDecorator(object):
     SEP = '.'
     """Separator character used to (un)flatten section.subsection.settings paths."""
 
-    def __init__(self, cls, cls_or_name, parent=None):
+    def __init__(
+        self,
+        cls,
+        cls_or_name,
+        parent=None,
+        default_value_type=None,
+    ):
         """Inits ConfigDecorator with decorated class, section name, and parent ref.
         """
         # (lb): Note that `make docs` ignores the __init__ docstring;
@@ -258,6 +264,8 @@ class ConfigDecorator(object):
             self._name = cls_or_name
         else:
             self._name = cls.__name__
+
+        self._default_value_type = default_value_type
 
         self._pull_kv_cache(parent)
 
@@ -622,11 +630,25 @@ class ConfigDecorator(object):
                 # that the setting exists. (The method is called "setdefault"
                 # to indicate its similarity to Python's ``dict.setdefault``.)
                 return conf_dcor._key_vals[setting_name]
+
+            # FIXME/2020-12-05 20:47: You could make default @section
+            # options for all @setting options...
+            typify_best_guess = self._default_value_type is None
+            if self._default_value_type is list:
+                default_val = []
+            elif self._default_value_type in (str, None):
+                default_val = ''
+            else:
+                default_val = None
+
             ckv = KeyChainedValue(
                 name=setting_name,
-                default_f=lambda x: '',
+                #default_f=lambda x: [] if self._default_value_type is list else '',
+                default_f=lambda x: default_val,
                 doc=_('Created by `setdefault`'),
                 section=self,
+                typify_best_guess=typify_best_guess,
+                value_type=self._default_value_type,
             )
             try:
                 ckv.value = setting_value
@@ -856,7 +878,8 @@ class ConfigDecorator(object):
     # ***
 
     # A @redecorator.
-    def section(self, name):
+    def section(self, name, default_value_type=None):
+
         """Class decorator used to create subsections.
 
         For instance::
@@ -883,7 +906,11 @@ class ConfigDecorator(object):
         :func:`section`
         for a more complete explanation.
         """
-        return section(name, parent=self)
+        return section(
+            name,
+            parent=self,
+            default_value_type=default_value_type,
+        )
 
     def setting(self, message=None, **kwargs):
         """Method decorator used to create individual settings in a configuration section.
@@ -961,7 +988,7 @@ class ConfigDecorator(object):
 #
 # Here we support either approach.
 
-def section(cls_or_name, parent=None):
+def section(cls_or_name, parent=None, default_value_type=None):
     """Class decorator used to indicate the root section of a settings configuration.
 
     For instance::
@@ -1053,7 +1080,12 @@ def section(cls_or_name, parent=None):
             return cfg_dcor
 
         # The constructor calls _pull_kv_cache if parent is not None.
-        return ConfigDecorator(cls, cls_or_name, parent=parent)
+        return ConfigDecorator(
+            cls,
+            cls_or_name,
+            parent=parent,
+            default_value_type=default_value_type,
+        )
 
     return _section()
 
