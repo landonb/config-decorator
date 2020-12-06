@@ -147,6 +147,8 @@ from functools import update_wrapper
 from gettext import gettext as _
 
 from .key_chained_val import KeyChainedValue
+from .slug_name_util import train2snakecase
+
 
 __all__ = (
     # So that the Sphinx docs do not generate help on the `section`
@@ -224,6 +226,7 @@ class ConfigDecorator(object):
         cls,
         cls_or_name,
         parent=None,
+        use_slug_names=None,
         default_value_type=None,
     ):
         """Inits ConfigDecorator with decorated class, section name, and parent ref.
@@ -264,6 +267,12 @@ class ConfigDecorator(object):
             self._name = cls_or_name
         else:
             self._name = cls.__name__
+
+        self._use_slug_names = use_slug_names
+        if self._use_slug_names is None:
+            # FIXME/2020-12-05 14:37: Where's my Python transpiler?
+            #  self._parent?._use_slug_names
+            self._use_slug_names = self._parent and self._parent._use_slug_names
 
         self._default_value_type = default_value_type
 
@@ -499,6 +508,7 @@ class ConfigDecorator(object):
         for section, conf_dcor in self._sections.items():
             if section in config:
                 unsubsumed, sub_errors = conf_dcor.update_known(
+# config[section] is mixed-case_aware?
                     config[section], errors_ok=errors_ok,
                 )
                 if not unsubsumed:
@@ -756,14 +766,31 @@ class ConfigDecorator(object):
 
         return _find_objects()
 
+    # self._use_slug_names
+    def _train2snakecase(self, name):
+        return train2snakecase(name)
+
+    # name can be slug-name or snake_name.
     def _find_objects_named(self, name, skip_sections=False):
         objects = []
-        if name in self._sections and not skip_sections:
-            # Exact section name match.
-            objects.append(self._sections[name])
-        if name in self._key_vals:
-            # Exact setting name match.
-            objects.append(self._key_vals[name])
+        if not skip_sections:
+# FIXME/2020-11-29 01:28: Like this? And should always try snakecase, or opt-in?
+# What about per-command, you could set in the @setting decorator...
+#            if name in self._sections:
+#                objects.append(self._sections[name])
+            for section, conf_dcor in self._sections.items():
+                if name == section or name == self._train2snakecase(section):
+                    objects.append(conf_dcor)
+#        if name in self._key_vals:
+#            # Exact setting name match.
+#            objects.append(self._key_vals[name])
+# MAYBE/2020-12-05 14:17: in _key_vals.items() and in _sections.items() wrappers
+# self._key_values.find_all(name)
+# or maybe just
+#   map(lambda ckv: objects.append(ckv), self._key_values.find(name))
+        for keyname, ckv in self._key_vals.items():
+            if name == keyname or name == self._train2snakecase(keyname):
+                objects.append(ckv)
         for section, conf_dcor in self._sections.items():
             # Loosy breadth-first search for name.
             objects.extend(conf_dcor._find_objects_named(name, skip_sections))
@@ -856,11 +883,16 @@ class ConfigDecorator(object):
 
     def _find_one_object(self, name, error_cls, asobj=False):
         parts = name.split(self.SEP)
+#
+#        import sys, pdb; pdb.set_trace()
         if len(parts) > 1:
             # User looked up, e.g., config['section1.section2....key'].
             objects = self.find_all(parts)
         else:
             objects = self._find_objects_named(name)
+#            if not objects:
+                # Convert train-case to snake_case.
+#                objects = self._find_objects_named(name.replace('-', '_'))
         if len(objects) > 1:
             raise error_cls(
                 _('More than one config object named: “{}”').format(name)
@@ -868,6 +900,8 @@ class ConfigDecorator(object):
         if objects:
             return objects[0].asobj if asobj else objects[0]
         else:
+#
+#            import sys, pdb; pdb.set_trace()
             # DEV: This happens if you lookup an attr in config you didn't define.
             raise error_cls(
                 _('Unknown section for {}.__getattr__(name="{}")').format(
@@ -878,7 +912,7 @@ class ConfigDecorator(object):
     # ***
 
     # A @redecorator.
-    def section(self, name, default_value_type=None):
+    def section(self, name, use_slug_names=None, default_value_type=None):
 
         """Class decorator used to create subsections.
 
@@ -909,6 +943,7 @@ class ConfigDecorator(object):
         return section(
             name,
             parent=self,
+            use_slug_names=use_slug_names,
             default_value_type=default_value_type,
         )
 
@@ -988,7 +1023,7 @@ class ConfigDecorator(object):
 #
 # Here we support either approach.
 
-def section(cls_or_name, parent=None, default_value_type=None):
+def section(cls_or_name, parent=None, use_slug_names=None, default_value_type=None):
     """Class decorator used to indicate the root section of a settings configuration.
 
     For instance::
@@ -1084,6 +1119,7 @@ def section(cls_or_name, parent=None, default_value_type=None):
             cls,
             cls_or_name,
             parent=parent,
+            use_slug_names=use_slug_names,
             default_value_type=default_value_type,
         )
 

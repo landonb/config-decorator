@@ -29,6 +29,8 @@ from gettext import gettext as _
 import os
 import sys
 
+from .slug_name_util import train2snakecase
+
 __all__ = (
     'KeyChainedValue',
 )
@@ -476,13 +478,10 @@ class KeyChainedValue(object):
         if self.warn_if_no_envvar_prefix():
             raise KeyError
 
-        environame = '{}{}_{}'.format(
-            KeyChainedValue._envvar_prefix,
-            self._section.section_path(sep='_').upper(),
-            self._name.upper(),
-        )
+        environame = self.key_envvar_path()
         envval = os.environ[environame]
         envval = self._value_conform_and_validate(envval)
+
         return envval
 
     def warn_if_no_envvar_prefix(self):
@@ -501,6 +500,16 @@ class KeyChainedValue(object):
         KeyChainedValue._envvar_warned = True
 
         return True
+
+    def key_envvar_path(self):
+        environame = '{}{}_{}'.format(
+            KeyChainedValue._envvar_prefix,
+            self._section.section_path(sep='_').upper(),
+            self._name.upper(),
+        )
+        environame = train2snakecase(environame)
+
+        return environame
 
     # ***
 
