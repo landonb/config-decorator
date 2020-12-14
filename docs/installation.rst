@@ -27,7 +27,7 @@ To develop on the project, link to the source files instead::
     $ rmvirtualenv config-decorator
     $ git clone git@github.com:hotoffthehamster/config-decorator.git
     $ cd config-decorator
-    $ mkvirtualenv -a $(pwd) --python=/usr/bin/python3.7 config-decorator
+    $ mkvirtualenv -a $(pwd) --python=/usr/bin/python3.8 config-decorator
     (config-decorator) $ make develop
 
 After creating the virtual environment,
